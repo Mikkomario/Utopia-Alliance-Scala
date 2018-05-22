@@ -25,8 +25,6 @@ object TableResources
     
     // OTHER    -------------------------
     
-    // TODO: Create a back up on demand
-    
     /**
      * A resource for the provided table, if there is one
      */

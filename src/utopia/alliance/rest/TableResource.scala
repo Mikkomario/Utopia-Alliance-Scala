@@ -24,6 +24,27 @@ class TableResource[T <: Storable](val factory: StorableFactory[T], val path: Pa
         val allowedMethods: Traversable[Method] = Vector(Get)) extends Resource
 {
     def name = path.lastElement
-	def follow(path: Path, request: Request)(implicit settings: ServerSettings): ResourceSearchResult = ???
+	def follow(path: Path, request: Request)(implicit settings: ServerSettings): ResourceSearchResult = 
+	{
+        // If the path references another resource, redirects the request to that resource
+        
+        
+        ???
+    }
 	def toResponse(request: Request, remainingPath: Option[Path])(implicit settings: ServerSettings): Response = ???
+	
+	private def findRelatedResource(relationName: String) = 
+	{
+	    relations.get(relationName).flatMap
+	    {
+	        relation => 
+	            // TODO: In order to continue, I need
+	            // a) context (db connection, possibly list of available resources) to requests
+	            // b) follow(storable) -method to relation
+	            // c) which requires simple init to storableFactory trait
+	            // d) which requires storable model class (mutable?)
+	            
+	            ???
+	    }
+	}
 }
