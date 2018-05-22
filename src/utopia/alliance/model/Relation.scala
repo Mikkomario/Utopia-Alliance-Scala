@@ -3,6 +3,7 @@ package utopia.alliance.model
 import utopia.vault.model.Reference
 import utopia.vault.model.Table
 import utopia.vault.model.References
+import utopia.vault.sql.Join
 
 object Relation
 {
@@ -96,3 +97,39 @@ object Relation
 **/
 case class Relation(val relationType: RelationType, val reference: Reference, 
         val bridges: Seq[Bridge] = Vector())
+{
+    /**
+     * The table the relation starts from
+     */
+    def from = reference.from.table
+    
+    /**
+     * The table the relation points to
+     */
+    def to = reference.to.table
+    
+    /**
+     * All references that form this relation
+     */
+    def references = 
+    {
+        if (bridges.isEmpty)
+            Vector(reference)
+        else
+        {
+            val refs = bridges.tail.foldLeft(Vector(Reference(reference.from, bridges.head.left)))(
+                    (refs, bridge) => refs :+ Reference(refs.last.to, bridge.left));
+            
+            refs :+ Reference(bridges.last.right, reference.to)
+        }
+    }
+    
+    /**
+     * Converts this relation to an sql target that contains all of the related tables
+     */
+    def toSqlTarget = 
+    {
+        val refs = references
+        refs.tail.foldLeft(refs.head.toSqlTarget)((target, ref) => target + Join(ref.from.column, ref.to))
+    }
+}

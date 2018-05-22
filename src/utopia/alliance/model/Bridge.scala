@@ -3,6 +3,7 @@ package utopia.alliance.model
 import utopia.vault.model.Table
 import utopia.vault.model.Column
 import utopia.vault.model.Reference
+import utopia.vault.model.ReferencePoint
 
 object Bridge
 {
@@ -25,4 +26,14 @@ case class Bridge(val table: Table, val leftColumn: Column, val rightColumn: Col
      * This bridge to the opposite direction
      */
 	def reversed = Bridge(table, rightColumn, leftColumn)
+	
+	/**
+	 * The left side (incoming) reference point
+	 */
+	def left = ReferencePoint(table, leftColumn)
+	
+	/**
+	 * The right side (outgoing) reference point
+	 */
+	def right = ReferencePoint(table, rightColumn)
 }

@@ -13,6 +13,8 @@ import utopia.nexus.rest.ResourceSearchResult
 import utopia.nexus.http.Response
 import utopia.alliance.model.Relation
 import scala.collection.immutable.HashMap
+import utopia.vault.sql.Join
+import utopia.vault.sql.Condition
 
 /**
 * This resource handles data in a single table, referencing other resources when necessary
@@ -21,30 +23,43 @@ import scala.collection.immutable.HashMap
 **/
 class TableResource[T <: Storable](val factory: StorableFactory[T], val path: Path, 
         val relations: Map[String, Relation] = HashMap(), 
-        val allowedMethods: Traversable[Method] = Vector(Get)) extends Resource
+        val allowedMethods: Traversable[Method] = Vector(Get)) extends Resource[DBContext]
 {
     def name = path.lastElement
-	def follow(path: Path, request: Request)(implicit settings: ServerSettings): ResourceSearchResult = 
+	def follow(path: Path, request: Request)(implicit context: DBContext): ResourceSearchResult = 
 	{
         // If the path references another resource, redirects the request to that resource
         
         
         ???
     }
-	def toResponse(request: Request, remainingPath: Option[Path])(implicit settings: ServerSettings): Response = ???
+	def toResponse(request: Request, remainingPath: Option[Path])(implicit context: DBContext): Response = ???
 	
-	private def findRelatedResource(relationName: String) = 
+	private def findRelatedResource(relationName: String, myCondition: Condition) = 
 	{
 	    relations.get(relationName).flatMap
 	    {
 	        relation => 
 	            // TODO: In order to continue, I need
-	            // a) context (db connection, possibly list of available resources) to requests
-	            // b) follow(storable) -method to relation
-	            // c) which requires simple init to storableFactory trait
-	            // d) which requires storable model class (mutable?)
+	            // a) context (db connection, possibly list of available resources) to requests -- DONE
+	            // b) follow(storable) -method to relation -- Let's implement it here instead
+	            // c) which requires simple init to storableFactory trait -- DONE
+	            // d) which requires storable model class (mutable?) -- DONE
 	            
-	            ???
+	            // Finds the targeted resource first
+	            TableResources.resourceForTable(relation.to).flatMap
+	            {
+	                target => 
+	                    
+	                    // One to many references ...
+	                    // TODO: How do you redirect for models, what about multiple models?
+	                    // -> Make a StorableResource and storableResourceSet classes the request 
+	                    //     can then be redirected to?
+	                    
+	                    // TODO: Also, here you should probably just return the target, 
+	                    // then handle according to remaining path
+	                    ???
+	            }
 	    }
 	}
 }
