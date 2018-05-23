@@ -29,12 +29,23 @@ class TableResource[T <: Storable](val factory: StorableFactory[T], val path: Pa
 	def follow(path: Path, request: Request)(implicit context: DBContext): ResourceSearchResult = 
 	{
         // If the path references another resource, redirects the request to that resource
-        
+        /*
+        val targetResource = relatedResource(path.head)
+        if (targetResource.isDefined)
+        {
+            
+        }*/
         
         ???
     }
 	def toResponse(request: Request, remainingPath: Option[Path])(implicit context: DBContext): Response = ???
 	
+	
+	
+	// private def relatedResource(relationName: String) = relations.get(relationName).flatMap(
+	//        relation => TableResources.resourceForTable(relation.reference.to.table))
+	
+	/*
 	private def findRelatedResource(relationName: String, myCondition: Condition) = 
 	{
 	    relations.get(relationName).flatMap
@@ -62,4 +73,5 @@ class TableResource[T <: Storable](val factory: StorableFactory[T], val path: Pa
 	            }
 	    }
 	}
+	*/
 }
