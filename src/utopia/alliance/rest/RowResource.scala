@@ -18,13 +18,16 @@ import utopia.flow.datastructure.immutable.Model
 import utopia.vault.sql.Update
 import utopia.vault.sql.Where
 import utopia.vault.sql.Condition
+import utopia.vault.model.Readable
+import utopia.access.http.Forbidden
+import utopia.access.http.MethodNotAllowed
 
 /**
 * These resources are used for handling request that concern a single model / row
 * @author Mikko Hilpinen
 * @since 23.5.2018
 **/
-class StorableResource(val data: Storable, methods: Traversable[Method]) extends Resource[DBContext]
+class RowResource(val data: Readable, methods: Traversable[Method]) extends Resource[DBContext]
 {
     // ATTRIBUTES    -----------------------
     
@@ -39,11 +42,22 @@ class StorableResource(val data: Storable, methods: Traversable[Method]) extends
     // The resource cannot forward requests
     def follow(path: Path)(implicit context: DBContext) = Ready(Some(path))
     
-    def toResponse(remainingPath: Option[Path])(implicit context: DBContext): utopia.nexus.http.Response = ???
+    def toResponse(remainingPath: Option[Path])(implicit context: DBContext) = 
+    {
+        val result = context.request.method match 
+        {
+            case Get => get(remainingPath)
+            case Put => put(remainingPath)
+            case Delete => delete(remainingPath)
+            case Post => Failure(MethodNotAllowed)
+        }
+        result.toResponse
+    }
     
     
     // OTHER    -----------------------------
     
+    // Either gets value of a certain attribute or the whole model
     private def get(remainingPath: Option[Path]) = 
     {
         if (remainingPath.isDefined)
@@ -57,28 +71,37 @@ class StorableResource(val data: Storable, methods: Traversable[Method]) extends
             Success(Model(Vector(finalVar)))
         }
         else
-        {
             Success(data.toModel)
-        }
     }
     
-    private def put(remainingPath: Option[Path])(implicit context: DBContext) = 
+    // Alters some columns
+    private def put(remainingPath: Option[Path])(implicit context: DBContext): Result = 
     {
+        implicit val connection = context.connection
+        
         if (remainingPath.isEmpty)
         {
-            val updatedValues = context.request.parameters.filter(c => data.table.find(c.name).isDefined)
-            if (updatedValues.isEmpty)
-                NoOperation
+            if (data.setAndUpdate(context.request.parameters))
+                Success(data.toModel)
             else
-                data.indexCondition.map
-                {
-                    c => 
-                        context.connection(Update(data.table, updatedValues) + Where(c))
-                        // TODO: Should return the new version of the model
-                        // For this we need not only storable, but also updatable
-                }
-            // Update(data.table, updatedValues) + Where.apply(data.)
+                NoOperation
         }
+        else
+            Failure(Forbidden, Some("PUT cannot target an attribute"))
+    }
+    
+    // Deletes the whole object
+    private def delete(remainingPath: Option[Path])(implicit context: DBContext): Result = 
+    {
+        implicit val connection = context.connection
+        
+        if (remainingPath.isEmpty)
+        {
+            data.delete()
+            Empty
+        }
+        else
+            Failure(Forbidden, Some("DELETE cannot target an attribute"))
     }
     
     // Finds values from a value recursively
