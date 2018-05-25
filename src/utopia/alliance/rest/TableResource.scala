@@ -26,7 +26,7 @@ class TableResource[T <: Storable](val factory: StorableFactory[T], val path: Pa
         val allowedMethods: Traversable[Method] = Vector(Get)) extends Resource[DBContext]
 {
     def name = path.lastElement
-	def follow(path: Path, request: Request)(implicit context: DBContext): ResourceSearchResult = 
+	def follow(path: Path)(implicit context: DBContext): ResourceSearchResult = 
 	{
         // If the path references another resource, redirects the request to that resource
         /*
@@ -38,7 +38,7 @@ class TableResource[T <: Storable](val factory: StorableFactory[T], val path: Pa
         
         ???
     }
-	def toResponse(request: Request, remainingPath: Option[Path])(implicit context: DBContext): Response = ???
+	def toResponse(remainingPath: Option[Path])(implicit context: DBContext): Response = ???
 	
 	
 	

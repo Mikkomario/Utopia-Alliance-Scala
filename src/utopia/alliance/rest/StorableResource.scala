@@ -3,6 +3,7 @@ package utopia.alliance.rest
 import utopia.flow.generic.ValueConversions._
 
 import utopia.access.http.Method._
+import utopia.nexus.result.Result._
 
 import utopia.nexus.rest.Resource
 import utopia.access.http.Method
@@ -11,6 +12,12 @@ import utopia.nexus.http.Path
 import utopia.nexus.http.Request
 import utopia.nexus.rest.Ready
 import utopia.flow.datastructure.immutable.Value
+import utopia.nexus.result.Result
+import utopia.nexus.result.Result.Success
+import utopia.flow.datastructure.immutable.Model
+import utopia.vault.sql.Update
+import utopia.vault.sql.Where
+import utopia.vault.sql.Condition
 
 /**
 * These resources are used for handling request that concern a single model / row
@@ -30,9 +37,9 @@ class StorableResource(val data: Storable, methods: Traversable[Method]) extends
     def name: String = data.index.stringOr()
     
     // The resource cannot forward requests
-    def follow(path: Path, request: Request)(implicit context: DBContext) = Ready(Some(path))
+    def follow(path: Path)(implicit context: DBContext) = Ready(Some(path))
     
-    def toResponse(request: Request, remainingPath: Option[Path])(implicit context: DBContext): utopia.nexus.http.Response = ???
+    def toResponse(remainingPath: Option[Path])(implicit context: DBContext): utopia.nexus.http.Response = ???
     
     
     // OTHER    -----------------------------
@@ -44,20 +51,55 @@ class StorableResource(val data: Storable, methods: Traversable[Method]) extends
             val name = remainingPath.get.head
             val baseValue = data.toModel(name)
             
-            val finalValue = remainingPath.get.tail.map(getFromValue(baseValue, _)) getOrElse baseValue
-            // TODO: Handle values better and wrap as a model with a single property
+            val finalVar = remainingPath.get.tail.map(getFromValue(name, baseValue, _)) getOrElse 
+                    (name -> baseValue);
+            
+            Success(Model(Vector(finalVar)))
         }
-        
-        ???
+        else
+        {
+            Success(data.toModel)
+        }
+    }
+    
+    private def put(remainingPath: Option[Path])(implicit context: DBContext) = 
+    {
+        if (remainingPath.isEmpty)
+        {
+            val updatedValues = context.request.parameters.filter(c => data.table.find(c.name).isDefined)
+            if (updatedValues.isEmpty)
+                NoOperation
+            else
+                data.indexCondition.map
+                {
+                    c => 
+                        context.connection(Update(data.table, updatedValues) + Where(c))
+                        // TODO: Should return the new version of the model
+                        // For this we need not only storable, but also updatable
+                }
+            // Update(data.table, updatedValues) + Where.apply(data.)
+        }
     }
     
     // Finds values from a value recursively
-    private def getFromValue(value: Value, path: Path): Value = 
+    private def getFromValue(name: String, value: Value, path: Path): Tuple2[String, Value] = 
     {
         val next = path.head
-        // Uses integer if possible / necessary
-        val nextValue = next.int.map(value.apply) getOrElse value(next)
         
-        path.tail.map(getFromValue(nextValue, _)) getOrElse nextValue
+        // Uses integer if possible / necessary
+        val nextInt = next.int
+        val nextIntResult = nextInt.map(value.apply)
+        if (nextIntResult.isDefined)
+        {
+            val nextName = name + "/" + nextInt.get
+            path.tail.map(getFromValue(nextName, nextIntResult.get, _)) getOrElse 
+                    (nextName -> nextIntResult.get)
+        }
+        else
+        {
+            // If no integer result was found, tries with string
+            val nextResult = value(next)
+            path.tail.map(getFromValue(next, nextResult, _)) getOrElse (next -> nextResult)
+        }
     }
 }
