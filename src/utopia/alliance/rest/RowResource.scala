@@ -27,7 +27,8 @@ import utopia.access.http.MethodNotAllowed
 * @author Mikko Hilpinen
 * @since 23.5.2018
 **/
-class RowResource(val data: Readable, methods: Traversable[Method]) extends Resource[DBContext]
+class RowResource(val data: Readable, methods: Traversable[Method] = Vector(Get)) 
+        extends Resource[DBContext]
 {
     // ATTRIBUTES    -----------------------
     
