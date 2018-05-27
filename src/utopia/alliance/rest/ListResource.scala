@@ -6,6 +6,8 @@ import utopia.vault.sql.Extensions._
 import utopia.access.http.Method._
 import utopia.nexus.result.Result._
 
+import utopia.vault.sql
+
 import utopia.nexus.rest.Resource
 import utopia.access.http.Method
 import utopia.vault.model.Table
@@ -25,6 +27,8 @@ import utopia.nexus.rest.Error
 import utopia.vault.sql.ConditionElement
 import utopia.vault.sql.Update
 import utopia.vault.sql.Where
+import utopia.nexus.result.Result
+import utopia.access.http.MethodNotAllowed
 
 /**
 * This resource represents a list of objects / rows
@@ -38,17 +42,8 @@ class ListResource(val name: String, val table: Table, val data: Seq[Readable],
     
     val allowedMethods = methods.filterNot(_ == Post)
     
-    // private val indexType = data.head.index.dataType
-    
     
     // COMPUTED    -----------------------
-    
-    /*
-    private def hasStringIndex = indexType.isOfType(StringType)
-    
-    private def hasNumberIndex = indexType.isOfType(IntType) || indexType.isOfType(LongType) || 
-                        indexType.isOfType(DoubleType)
-    */
     
     private def indexCondition = table.primaryColumn.map(_ in data.map(_.index: ConditionElement))
     
@@ -76,8 +71,15 @@ class ListResource(val name: String, val table: Table, val data: Seq[Readable],
     {
         if (remainingPath.isEmpty)
         {
-            // TODO: Add support for different methods
-            Success(Model(Vector(name -> data.map(_.toModel).toVector))).toResponse
+            val result = context.request.method match 
+            {
+                case Get => get()
+                case Put => put()
+                case Delete => delete()
+                case _ => Failure(MethodNotAllowed)
+            }
+            
+            result.toResponse
         }
         else 
             Error().toResult.toResponse
@@ -88,21 +90,42 @@ class ListResource(val name: String, val table: Table, val data: Seq[Readable],
     
     private def get() = Success(Model(Vector(name -> data.map(_.toModel).toVector)))
     
-    private def put()(implicit context: DBContext) = 
+    private def put()(implicit context: DBContext): Result = 
     {
+        implicit val connection = context.connection
+        
         if (data.isEmpty)
             NoOperation
         else
         {
-            // TODO: Return something else when index condition fails?
-            // Updates the target rows, doesn't return anything
-            // indexCondition.map(Update(table, context.request.parameters) + Where(_)).foreach(
-            //        context.connection.apply);
-            // TODO: Implement
+            val condition = indexCondition
+            
+            if (condition.isDefined)
+            {
+                val update = Update(table, context.request.parameters).map(_ + Where(condition.get))
+                update.foreach(_.execute())
+                if (update.isDefined) Empty else NoOperation
+            }
+            else
+                Failure(Forbidden, Some("Cannot update items from tables withoud index"))
         }
     }
     
-    // For non-text type 'first' and 'last' are supported
+    private def delete()(implicit context: DBContext): Result = 
+    {
+        implicit val connection = context.connection
+        
+        if (data.isEmpty)
+            NoOperation
+        else
+        {
+            val delete = indexCondition.map(sql.Delete(table) + Where(_))
+            delete.foreach(_.execute())
+            if (delete.isDefined) Empty else Failure(Forbidden, Some(
+                    "Cannot delete items from tables without index"))
+        }
+    }
+    
     private def findWithPosition(next: String) = name match 
     {
         case "first" => data.headOption
