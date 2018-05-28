@@ -21,7 +21,7 @@ import utopia.vault.sql.Condition
 * @author Mikko Hilpinen
 * @since 22.5.2018
 **/
-class TableResource[T <: Storable](val factory: StorableFactory[T], val path: Path, 
+class TableResource[+T <: Storable](val factory: StorableFactory[T], val path: Path, 
         val relations: Map[String, Relation] = HashMap(), 
         val allowedMethods: Traversable[Method] = Vector(Get)) extends Resource[DBContext]
 {
@@ -40,10 +40,27 @@ class TableResource[T <: Storable](val factory: StorableFactory[T], val path: Pa
     }
 	def toResponse(remainingPath: Option[Path])(implicit context: DBContext): Response = ???
 	
+	// TODO: On post handling, also create the appropriate bridges
+	// TODO: Handle ordering (including default order)
+	// TODO: Create read-only versions for these resources
 	
+	/**
+	 * @return a resource for the specified relation name. Also includes the relation itself
+	 */
+	def relatedResource(relationName: String) = relations.get(relationName).flatMap(relation => 
+	        TableResources.resourceForTable(relation.reference.to.table).map(relation -> _));
 	
-	// private def relatedResource(relationName: String) = relations.get(relationName).flatMap(
-	//        relation => TableResources.resourceForTable(relation.reference.to.table))
+	/*
+	def relatedResource2(relationName: String): Option[Tuple2[Relation, TableResource[_]]] = 
+	{
+	    val relation = relations.get(relationName)
+	    val res = relation.flatMap(rel => TableResources.resourceForTable(rel.reference.to.table))
+	    
+	    if (res.isDefined)
+	        relation.get -> res.get
+	    else
+	        None
+	}*/
 	
 	/*
 	private def findRelatedResource(relationName: String, myCondition: Condition) = 

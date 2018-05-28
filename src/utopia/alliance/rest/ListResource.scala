@@ -60,6 +60,8 @@ class ListResource(val name: String, val table: Table, val data: Seq[Readable],
             Follow(new RowResource(singleResult.get, allowedMethods), path.tail)
         else
         {
+            // TODO: Use table resource to map into related resources
+            // Also, maybe should allow access to certain object property
             // Next tries to find a segment from this list and follow with that
             // Otherwise has to return "Not Found"
             val range = findWithRange(next).map(new ListResource(name + "/" + next, table, _, methods))
