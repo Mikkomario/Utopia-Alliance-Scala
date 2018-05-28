@@ -3,6 +3,7 @@ package utopia.alliance.rest
 import scala.collection.immutable.HashSet
 import utopia.vault.model.Table
 import utopia.vault.model.Storable
+import utopia.vault.model.Readable
 
 /**
 * This class keeps track of all different table resource in order to provide shared data
@@ -13,7 +14,7 @@ object TableResources
 {
 	// ATTRIBUTES    ---------------------
     
-    private var resources = HashSet[TableResource[Storable]]()
+    private var resources = HashSet[TableResource[Readable]]()
     
     
     // COMPUTED    ----------------------
@@ -39,11 +40,11 @@ object TableResources
     /**
      * Introduces a new resource to this set
      */
-    def introduce(resource: TableResource[Storable]) = resources += resource
+    def introduce(resource: TableResource[Readable]) = resources += resource
     
     /**
      * Introduces multiple resources to this set
      */
-    def introduce(first: TableResource[Storable], second: TableResource[Storable], 
-            more: TableResource[Storable]*) = resources ++= first +: second +: more
+    def introduce(first: TableResource[Readable], second: TableResource[Readable], 
+            more: TableResource[Readable]*) = resources ++= first +: second +: more
 }

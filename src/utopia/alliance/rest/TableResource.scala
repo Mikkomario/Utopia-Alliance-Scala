@@ -15,16 +15,21 @@ import utopia.alliance.model.Relation
 import scala.collection.immutable.HashMap
 import utopia.vault.sql.Join
 import utopia.vault.sql.Condition
+import utopia.vault.model.Readable
 
 /**
 * This resource handles data in a single table, referencing other resources when necessary
 * @author Mikko Hilpinen
 * @since 22.5.2018
 **/
-class TableResource[+T <: Storable](val factory: StorableFactory[T], val path: Path, 
+class TableResource[+T <: Readable](val factory: StorableFactory[T], val path: Path, 
         val relations: Map[String, Relation] = HashMap(), 
         val allowedMethods: Traversable[Method] = Vector(Get)) extends Resource[DBContext]
 {
+    // COMPUTED    --------------------
+    
+    def table = factory.table
+    
     def name = path.lastElement
 	def follow(path: Path)(implicit context: DBContext): ResourceSearchResult = 
 	{
