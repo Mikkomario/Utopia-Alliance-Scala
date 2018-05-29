@@ -71,7 +71,7 @@ class ListResource(val name: String, val tableResource: TableResource[Readable],
             // If a singular instance is targeted, the query is directed for the targeted row
             val singleResult = findWithPosition(next) orElse findWithIndex(next)
             if (singleResult.isDefined)
-                Follow(new RowResource(singleResult.get, allowedMethods), path.tail)
+                Follow(new RowResource(singleResult.get, tableResource), path.tail)
             else
             {
                 // Next tries to find a segment from this list and follow with that
@@ -102,8 +102,13 @@ class ListResource(val name: String, val tableResource: TableResource[Readable],
         {
             val next = remainingPath.get.head
             if (table.contains(next))
-                Success(Model(Vector(name + "/" + next -> 
-                        data.map(_.toModel(next)).filter(_.isDefined).toVector))).toResponse
+            {
+                if (context.request.method == Get)
+                    Success(Model(Vector(name + "/" + next -> 
+                            data.map(_.toModel(next)).filter(_.isDefined).toVector))).toResponse
+                else
+                    Error(MethodNotAllowed).toResult.toResponse
+            }
             else
                 Error().toResult.toResponse
         }

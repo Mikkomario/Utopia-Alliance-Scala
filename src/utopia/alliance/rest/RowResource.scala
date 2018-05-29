@@ -21,19 +21,23 @@ import utopia.vault.sql.Condition
 import utopia.vault.model.Readable
 import utopia.access.http.Forbidden
 import utopia.access.http.MethodNotAllowed
+import utopia.alliance.model.ToMany
+import utopia.vault.sql.Select
+import utopia.vault.model.DBModel
+import utopia.nexus.rest.Follow
+import utopia.vault.sql.Limit
 
 /**
 * These resources are used for handling request that concern a single model / row
 * @author Mikko Hilpinen
 * @since 23.5.2018
 **/
-class RowResource(val data: Readable, methods: Traversable[Method] = Vector(Get)) 
+class RowResource(val data: Readable, val tableResource: TableResource[Readable]) 
         extends Resource[DBContext]
 {
     // ATTRIBUTES    -----------------------
     
-    // Resources cannot post more resources (that is handled in upper resources)
-    val allowedMethods = methods.filterNot(_ == Post)
+    val allowedMethods = tableResource.allowedMethods
     
     
     // IMPLEMENTED -------------------------
@@ -41,6 +45,8 @@ class RowResource(val data: Readable, methods: Traversable[Method] = Vector(Get)
     def name: String = data.index.stringOr()
     
     // The resource cannot forward requests
+    // TODO: Relay request to reference, if applicable
+    // But how to handle posts?
     def follow(path: Path)(implicit context: DBContext) = Ready(Some(path))
     
     def toResponse(remainingPath: Option[Path])(implicit context: DBContext) = 
@@ -124,6 +130,34 @@ class RowResource(val data: Readable, methods: Traversable[Method] = Vector(Get)
             // If no integer result was found, tries with string
             val nextResult = value(next)
             path.tail.map(getFromValue(next, nextResult, _)) getOrElse (next -> nextResult)
+        }
+    }
+    
+    private def findWithReference(refName: String)(implicit context: DBContext) = 
+    {
+        implicit val connection = context.connection
+        
+        tableResource.relatedResource(refName).flatMap
+        {
+            case (relation, target) => 
+                
+                val select = data.indexCondition.map(Select(relation.toSqlTarget, 
+                            target.table.columns) + Where(_));
+                
+                // toMany relation -> link to a list
+                if (relation.relationType == ToMany)
+                {
+                    // Only includes non-empty lists
+                    select.map(_.execute().rows.map(_.toModel).map(
+                            DBModel(target.table, _))).filterNot(_.isEmpty).map(
+                            new ListResource(refName, target, _));
+                }
+                else
+                {
+                    // To 0-1 relation -> link to another resource, if possible
+                    select.map(_ + Limit(1)).flatMap(_.execute().firstModel).map(
+                            DBModel(target.table, _)).map(new RowResource(_, target))
+                }
         }
     }
 }
