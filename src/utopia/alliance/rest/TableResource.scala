@@ -1,5 +1,7 @@
 package utopia.alliance.rest
 
+import utopia.flow.generic.ValueConversions._
+
 import utopia.access.http.Method._
 
 import utopia.vault.model.Storable
@@ -16,6 +18,17 @@ import scala.collection.immutable.HashMap
 import utopia.vault.sql.Join
 import utopia.vault.sql.Condition
 import utopia.vault.model.Readable
+import utopia.flow.datastructure.immutable.Value
+import utopia.vault.model.Table
+import utopia.vault.model.DBModel
+import scala.util.Try
+import scala.util.Success
+import utopia.access.http.Created
+import utopia.nexus.result.Result
+import scala.util.Failure
+import utopia.access.http.BadRequest
+import utopia.flow.datastructure.immutable.Model
+import utopia.vault.model.Reference
 
 /**
 * This resource handles data in a single table, referencing other resources when necessary
@@ -54,6 +67,62 @@ class TableResource[+T <: Readable](val factory: StorableFactory[T], val path: P
 	 */
 	def relatedResource(relationName: String) = relations.get(relationName).flatMap(relation => 
 	        TableResources.resourceForTable(relation.reference.to.table).map(relation -> _));
+	
+	/**
+	 * Posts a new item to this table based on the provided context
+	 */
+	def post()(implicit context: DBContext) = 
+	{
+	    // Will only include table variables, excluding any auto-increment items
+	    val atts = context.request.parameters.filter(
+	            c => table.find(c.name).exists(!_.usesAutoIncrement));
+	    
+	    // Checks that the provided attributes form a complete insert
+	    val missingParams = table.columns.filter(_.isRequiredInInsert).filterNot(
+	            c => atts(c.name).isDefined)
+	    if (missingParams.isEmpty)
+	    {
+	        implicit val connection = context.connection
+	        implicit val settings = context.settings
+	        
+	        val model = DBModel(table, atts)
+	        Try(model.insert()) match 
+	        {
+	            case Success(index) => 
+	            {
+	                model.index = index
+	                Result.Success(model.immutableCopy(), Created).toResponse.withModifiedHeaders(
+	                        _.withLocation((path/(index.toString())).toServerUrl))
+	            }
+	            case Failure(e) => Result.Failure(BadRequest, Some(e.getMessage)).toResponse
+	        }
+	    }
+	    else
+	        Result.Failure(BadRequest, Some("Requires parameters: " + 
+	                missingParams.map(_.name).reduce(_ + ", " + _ )), 
+	                Model(Vector("required" -> missingParams.map(_.name))))
+	}
+	
+	def postRelationTarget(relation: Relation, target: Table, sourceIndex: Value)
+	        (implicit context: DBContext) = 
+	{
+	    // TODO: If last reference is from the target table (not to), finds the correct value*, 
+	    // then inserts. Otherwise just inserts and keeps the index
+	    // * This may require creation of the bridging rows
+	    // Afterwards, (if last reference to target table), create the bridges / references
+	    // This may require use of recursion (each bridged table at a time), which may make this 
+	    // easier
+	    // -> This doesn't work when, for example a bridge requires both of the indices -> 
+	    // bridges should be created last
+	    // This also creates a limitation that bridges may not have more than the 2 required 
+	    // columns
+	    // Also, this means that there can only be a single bridge per relation max (because 
+	    // multiples can't be created at once)
+	    // -> Change relation structure (actually, don't. Some relations simply aren't pushable)
+	    // -> Also, remove type parameters from tableResource while you're at it
+	    // Also... there should be a way to determine whether a bridge references a table or is 
+	    // being referenced from one
+	}
 	
 	/*
 	def relatedResource2(relationName: String): Option[Tuple2[Relation, TableResource[_]]] = 

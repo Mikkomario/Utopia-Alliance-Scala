@@ -98,6 +98,8 @@ object Relation
 case class Relation(val relationType: RelationType, val reference: Reference, 
         val bridges: Seq[Bridge] = Vector())
 {
+    // COMPUTED    --------------------
+    
     /**
      * The table the relation starts from
      */
@@ -132,4 +134,9 @@ case class Relation(val relationType: RelationType, val reference: Reference,
         val refs = references
         refs.tail.foldLeft(refs.head.toSqlTarget)((target, ref) => target + Join(ref.from.column, ref.to))
     }
+    
+    /**
+     * Only relations with less than 2 bridges can be inserted to database
+     */
+    def canBeInserted = bridges.size < 2
 }
