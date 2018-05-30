@@ -4,6 +4,7 @@ import utopia.vault.model.Reference
 import utopia.vault.model.Table
 import utopia.vault.model.References
 import utopia.vault.sql.Join
+import utopia.vault.model.ReferencePoint
 
 object Relation
 {
@@ -12,16 +13,7 @@ object Relation
      * References must be set up before this method can be used.
      */
     def apply(relationType: RelationType, first: Table, second: Table, more: Table*) = 
-    {
-        referencesBridging(first +: second +: more).map 
-        {
-            references => 
-            val bridges = for (i <- 0 until (references.size - 1)) yield { 
-                    Bridge.between(references(i), references(i + 1)).get }
-            
-            new Relation(relationType, Reference(references.head.from, references.last.to), bridges)
-        }
-    }
+            forTables(relationType, first, second, more);
     
     /**
      * A one to many relation that bridges the provided tables. None if there is no relation between 
@@ -46,7 +38,8 @@ object Relation
     
     private def forTables(relationType: RelationType, first: Table, second: Table, more: Seq[Table]) = 
     {
-        Relation(relationType, first, second, more: _*)
+        val allTables = first +: second +: more
+        referencesBridging(allTables).map(new Relation(first, allTables.last, relationType, _))
     }
     
     /**
@@ -57,25 +50,29 @@ object Relation
     def between(first: Table, second: Table, more: Table*) = 
     {
         val tables = first +: second +: more
-        val style: Option[RelationType] = referencesBridging(tables).map
+        referencesBridging(tables).map
         {
             references => 
-                // If the references are always for the first / left table
-                // a) if all are not null colums -> toOne relation
-                // b) if null allowed anywhere -> toSome relation
-                // Otherwise toMany relation
-                if (tables.zip(references).forall { case (table, ref) => ref.from.table == table })
+                
+                val style: RelationType = 
                 {
-                    if (references.forall(!_.from.column.allowsNull))
-                        ToOne
+                    // If the references are always for the first / left table
+                    // a) if all are not null colums -> toOne relation
+                    // b) if null allowed anywhere -> toSome relation
+                    // Otherwise toMany relation
+                    if (tables.zip(references).forall { case (table, ref) => ref.from.table == table })
+                    {
+                        if (references.forall(!_.from.column.allowsNull))
+                            ToOne
+                        else
+                            ToSome
+                    }
                     else
-                        ToSome
+                        ToMany
                 }
-                else
-                    ToMany
+                
+                Relation(first, tables.last, style, references)
         }
-        
-        style.flatMap(forTables(_, first, second, more))
     }
     
     private def referencesBridging(tables: Seq[Table]) = 
@@ -95,48 +92,57 @@ object Relation
 * @author Mikko Hilpinen
 * @since 21.5.2018
 **/
-case class Relation(val relationType: RelationType, val reference: Reference, 
-        val bridges: Seq[Bridge] = Vector())
+case class Relation(val from: Table, val to: Table, val relationType: RelationType, 
+        val references: Seq[Reference])
 {
-    // COMPUTED    --------------------
+    // ATTRIBUTES    ------------------
     
     /**
-     * The table the relation starts from
+     * The bridges that are part of this relation (if this relation uses bridging tables)
      */
-    def from = reference.from.table
+    val bridges = for (i <- 0 until (references.size - 1)) yield { Bridge(references(i), references(i + 1)) }
     
-    /**
-     * The table the relation points to
-     */
-    def to = reference.to.table
-    
-    /**
-     * All references that form this relation
-     */
-    def references = 
+    private val links = 
     {
-        if (bridges.isEmpty)
-            Vector(reference)
-        else
+        var lastTable = from
+        val points = references.flatMap
         {
-            val refs = bridges.tail.foldLeft(Vector(Reference(reference.from, bridges.head.left)))(
-                    (refs, bridge) => refs :+ Reference(refs.last.to, bridge.left));
-            
-            refs :+ Reference(bridges.last.right, reference.to)
+            ref => 
+                if (ref.from.table == lastTable)
+                {
+                    lastTable = ref.to.table
+                    Vector(ref.from, ref.to)
+                }
+                else
+                {
+                    lastTable = ref.from.table
+                    Vector(ref.to, ref.from)
+                }
         }
+        for (i <- 0 until (points.size - 1)) yield { Reference(points(i), points(i + 1)) }
     }
+    
+    
+    // COMPUTED    --------------------
     
     /**
      * Converts this relation to an sql target that contains all of the related tables
      */
     def toSqlTarget = 
     {
-        val refs = references
-        refs.tail.foldLeft(refs.head.toSqlTarget)((target, ref) => target + Join(ref.from.column, ref.to))
+        links.tail.foldLeft(links.head.toSqlTarget)((target, ref) => target + Join(ref.from.column, ref.to))
     }
     
     /**
-     * Only relations with less than 2 bridges can be inserted to database
+     * All of the additional parameters that are required for a post to the target table when 
+     * source table index is known
      */
-    def canBeInserted = bridges.size < 2
+    def requiredPostParams = 
+    {
+        val lastReferenceColums = references.last.columns
+        val requiredByTarget = to.columns.filterNot(lastReferenceColums.contains).filter(
+                _.isRequiredInInsert);
+        
+        bridges.flatMap(_.requiredPostParams) ++ requiredByTarget
+    }
 }

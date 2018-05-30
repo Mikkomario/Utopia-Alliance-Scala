@@ -66,7 +66,7 @@ class TableResource[+T <: Readable](val factory: StorableFactory[T], val path: P
 	 * @return a resource for the specified relation name. Also includes the relation itself
 	 */
 	def relatedResource(relationName: String) = relations.get(relationName).flatMap(relation => 
-	        TableResources.resourceForTable(relation.reference.to.table).map(relation -> _));
+	        TableResources.resourceForTable(relation.to).map(relation -> _));
 	
 	/**
 	 * Posts a new item to this table based on the provided context

@@ -5,35 +5,46 @@ import utopia.vault.model.Column
 import utopia.vault.model.Reference
 import utopia.vault.model.ReferencePoint
 
-object Bridge
-{
-    /**
-     * A bridge between the two references. None if the references aren't linked
-     */
-    def between(first: Reference, second: Reference) = if (first.to.table == second.from.table) 
-            Some(Bridge(first.to.table, first.to.column, second.from.column)) else None
-}
-
 /**
 * A bridge is a table that binds two tables together via references in order to create a 
 * many to many relation
 * @author Mikko Hilpinen
 * @since 21.5.2018
 **/
-case class Bridge(val table: Table, val leftColumn: Column, val rightColumn: Column)
+case class Bridge(val left: Reference, val right: Reference)
 {
+    /**
+     * The tables that are part of this bridge
+     */
+    val tables = (left.tables ++ right.tables).distinct
+    
+    /**
+     * The table the bridging resource is located at
+     */
+    val table = left.tables.find(right.tables.contains).get
+    
     /**
      * This bridge to the opposite direction
      */
-	def reversed = Bridge(table, rightColumn, leftColumn)
+	def reversed = Bridge(right, left)
 	
 	/**
-	 * The left side (incoming) reference point
+	 * The left side reference point
 	 */
-	def left = ReferencePoint(table, leftColumn)
+	def leftPoint = if (left.from.table == table) left.from else left.to
 	
 	/**
-	 * The right side (outgoing) reference point
+	 * The right side reference point
 	 */
-	def right = ReferencePoint(table, rightColumn)
+	def rightPoint = if (right.from.table == table) right.from else right.to
+	
+	/**
+	 * The parameters that must be provided if one is to insert an instance of this bridge to a 
+	 * database
+	 */
+	def requiredPostParams = 
+    {
+	    val refColumns = left.columns ++ right.columns
+	    table.columns.filterNot(refColumns.contains).filter(_.isRequiredInInsert).map(_.name)
+    }
 }
