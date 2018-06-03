@@ -5,6 +5,13 @@ import utopia.vault.model.Table
 import utopia.vault.model.References
 import utopia.vault.sql.Join
 import utopia.vault.model.ReferencePoint
+import utopia.flow.datastructure.immutable.Model
+import utopia.flow.datastructure.immutable.Constant
+import utopia.alliance.rest.DBContext
+import utopia.vault.model.DBModel
+import scala.util.Try
+import scala.util.Success
+import scala.util.Failure
 
 object Relation
 {
@@ -144,5 +151,46 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
                 _.isRequiredInInsert);
         
         bridges.flatMap(_.requiredPostParams) ++ requiredByTarget
+    }
+    
+    private def makePost(remainingTables: Seq[Table], existingData: Map[Table, Model[Constant]])
+            (implicit context: DBContext) = 
+    {
+        // Finds the next table that can be posted
+        val (table, params) = remainingTables.view.map(
+                table => table -> canPost(table, existingData)).find(
+                _._2.isDefined).map(p => p._1 -> p._2.get).get;
+        
+        val attributes = context.request.parameters.filter(p => table.find(p.name).exists(
+                !_.usesAutoIncrement)) ++ params;
+        val model = DBModel(table, attributes)
+        
+        Try(model.insert()(context.connection)) match 
+        {
+            case Success(index) => 
+            {
+                // TODO: Continue by defining the next remaining tables (if empty, finished) 
+                // and use recurstion. Return a success or a failure
+                // Add new data to existing data for next iteration
+                
+                Unit
+            }
+            case Failure(e) => Unit
+        }
+    }
+    
+    // Returns some(params) if OK, none if NOT OK
+    private def canPost(table: Table, existingData: Map[Table, Model[Constant]]) = 
+    {
+        // Checks the references, if there are references from the table, the targets must already 
+        // be defined
+        val fromReferences = references.filter(_.from.table == table)
+        if (fromReferences.forall(ref => existingData.contains(ref.to.table)))
+        {
+            Some(fromReferences.map(ref => new Constant(ref.from.column.name, 
+                    existingData(ref.to.table)(ref.to.column.name))))
+        }
+        else
+            None
     }
 }

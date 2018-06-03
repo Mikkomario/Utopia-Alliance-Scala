@@ -100,7 +100,7 @@ class TableResource[+T <: Readable](val factory: StorableFactory[T], val path: P
 	    else
 	        Result.Failure(BadRequest, Some("Requires parameters: " + 
 	                missingParams.map(_.name).reduce(_ + ", " + _ )), 
-	                Model(Vector("required" -> missingParams.map(_.name))))
+	                Model(Vector("required" -> missingParams.map(_.name)))).toResponse
 	}
 	
 	def postRelationTarget(relation: Relation, target: Table, sourceIndex: Value)
@@ -123,6 +123,8 @@ class TableResource[+T <: Readable](val factory: StorableFactory[T], val path: P
 	    // Also... there should be a way to determine whether a bridge references a table or is 
 	    // being referenced from one
 	}
+	
+	
 	
 	/*
 	def relatedResource2(relationName: String): Option[Tuple2[Relation, TableResource[_]]] = 
