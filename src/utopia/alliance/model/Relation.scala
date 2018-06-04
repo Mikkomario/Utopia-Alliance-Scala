@@ -12,6 +12,7 @@ import utopia.vault.model.DBModel
 import scala.util.Try
 import scala.util.Success
 import scala.util.Failure
+import scala.collection.immutable.HashMap
 
 object Relation
 {
@@ -148,13 +149,25 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
     {
         val lastReferenceColums = references.last.columns
         val requiredByTarget = to.columns.filterNot(lastReferenceColums.contains).filter(
-                _.isRequiredInInsert);
+                _.isRequiredInInsert).map(_.name);
         
         bridges.flatMap(_.requiredPostParams) ++ requiredByTarget
     }
     
+    def postFrom(model: Model[Constant])(implicit context: DBContext) = 
+    {
+        // TODO: Result should allow header modifications (for location)
+        // Also, return a Result here
+        // Checks if all required parameters have been provided
+        if (requiredPostParams.forall(context.request.parameters.contains))
+        {
+            makePost(bridges.map(_.table) :+ to, HashMap(from -> model)).map(_(to))
+        }
+        
+    }
+    
     private def makePost(remainingTables: Seq[Table], existingData: Map[Table, Model[Constant]])
-            (implicit context: DBContext) = 
+            (implicit context: DBContext): Try[Map[Table, Model[Constant]]] = 
     {
         // Finds the next table that can be posted
         val (table, params) = remainingTables.view.map(
@@ -169,13 +182,18 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
         {
             case Success(index) => 
             {
-                // TODO: Continue by defining the next remaining tables (if empty, finished) 
-                // and use recurstion. Return a success or a failure
-                // Add new data to existing data for next iteration
+                // Uses recursion to generate the remaining data
+                model.index = index
+                val nextRemainingTables = remainingTables.filterNot(_ == table)
+                val nextExistingData = existingData + (table -> model.immutableCopy())
                 
-                Unit
+                // When no data remains, returns success
+                if (nextRemainingTables.isEmpty)
+                    Success(nextExistingData)
+                else
+                    makePost(nextRemainingTables, nextExistingData)
             }
-            case Failure(e) => Unit
+            case Failure(e) => Failure(e)
         }
     }
     
