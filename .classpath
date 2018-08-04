@@ -6,6 +6,6 @@
 	<classpathentry kind="lib" path="/Utopia_Flow_Rebuild/bin" sourcepath="/Utopia_Flow_Rebuild/src"/>
 	<classpathentry kind="lib" path="/Utopia_Vault_Rebuild/bin"/>
 	<classpathentry kind="lib" path="/Utopia_Access/bin" sourcepath="/Utopia_Access/src"/>
-	<classpathentry kind="lib" path="/Utopia_Nexus_Rebuild/bin"/>
+	<classpathentry kind="lib" path="/Utopia_Nexus_Rebuild/bin" sourcepath="/Utopia_Nexus_Rebuild/src"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

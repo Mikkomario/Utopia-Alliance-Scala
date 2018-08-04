@@ -1,5 +1,7 @@
 package utopia.alliance.model
 
+import utopia.flow.util.NullSafe._
+
 import utopia.vault.model.Reference
 import utopia.vault.model.Table
 import utopia.vault.model.References
@@ -13,6 +15,11 @@ import scala.util.Try
 import scala.util.Success
 import scala.util.Failure
 import scala.collection.immutable.HashMap
+import utopia.nexus.result.Result
+import utopia.alliance.rest.TableResources
+import utopia.access.http.Headers
+import utopia.access.http.InternalServerError
+import utopia.access.http.BadRequest
 
 object Relation
 {
@@ -138,6 +145,7 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
      */
     def toSqlTarget = 
     {
+        // The first target contains 2 tables. Adds the remaining tables.
         links.tail.foldLeft(links.head.toSqlTarget)((target, ref) => target + Join(ref.from.column, ref.to))
     }
     
@@ -154,16 +162,51 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
         bridges.flatMap(_.requiredPostParams) ++ requiredByTarget
     }
     
-    def postFrom(model: Model[Constant])(implicit context: DBContext) = 
+    /**
+     * Makes a post based on existing model data (for the 'from' table). Inserts the target data and 
+     * data for all bridges between the two tables. Checks if all of the required parameters have 
+     * been provided.
+     * @param model A database read model from the 'from' table
+     * @returns Result of the operation
+     */
+    def postFrom(model: Model[Constant])(implicit context: DBContext): Result = 
     {
-        // TODO: Result should allow header modifications (for location)
-        // Also, return a Result here
+        implicit val settings = context.settings
+        
         // Checks if all required parameters have been provided
         if (requiredPostParams.forall(context.request.parameters.contains))
         {
-            makePost(bridges.map(_.table) :+ to, HashMap(from -> model)).map(_(to))
+            makePost(bridges.map(_.table) :+ to, HashMap(from -> model)).map(_(to)) match 
+            {
+                case Success(newModel) => 
+                {
+                    // Finds out the location path for the newly created model (= target / index)
+                    val location = TableResources.resourceForTable(to) match 
+                    {
+                        case Some(resource) =>
+                        {
+                            resource.table.primaryColumn match 
+                            {
+                                case Some(indexColumn) => 
+                                    newModel(indexColumn.name).string.map(resource.path/_)
+                                case None => None
+                            }
+                        }
+                        case None => None
+                    }
+                    // Creates location headers & wraps to result
+                    val headers = location.map(_.toServerUrl).map(
+                            Headers().withLocation).getOrElse(Headers.empty)
+                    Result.Success(data = newModel, headers = headers)
+                }
+                case Failure(e) => Result.Failure(InternalServerError, e.getMessage.toOption)
+            }
         }
-        
+        else
+        {
+            Result.Failure(BadRequest, Some(s"Requires parameters: [${ 
+                requiredPostParams.reduce(_ + ", " + _) }]"))
+        }
     }
     
     private def makePost(remainingTables: Seq[Table], existingData: Map[Table, Model[Constant]])
@@ -174,10 +217,13 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
                 table => table -> canPost(table, existingData)).find(
                 _._2.isDefined).map(p => p._1 -> p._2.get).get;
         
+        // TODO: Also use parameters specified for this table (eg. users.name -> name) 
+        // (Required post params logic needs to be altered at that point)
         val attributes = context.request.parameters.filter(p => table.find(p.name).exists(
                 !_.usesAutoIncrement)) ++ params;
         val model = DBModel(table, attributes)
         
+        // Attempts to insert the new model to DB
         Try(model.insert()(context.connection)) match 
         {
             case Success(index) => 
