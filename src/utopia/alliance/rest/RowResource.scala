@@ -140,7 +140,7 @@ class RowResource(val data: Readable, val tableResource: TableResource[Readable]
         tableResource.relatedResource(refName).flatMap
         {
             case (relation, target) => 
-                
+            {    
                 val select = data.indexCondition.map(Select(relation.toSqlTarget, 
                             target.table.columns) + Where(_));
                 
@@ -158,6 +158,7 @@ class RowResource(val data: Readable, val tableResource: TableResource[Readable]
                     select.map(_ + Limit(1)).flatMap(_.execute().firstModel).map(
                             DBModel(target.table, _)).map(new RowResource(_, target))
                 }
+            }
         }
     }
 }

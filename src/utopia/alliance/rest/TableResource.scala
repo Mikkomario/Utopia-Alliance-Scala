@@ -85,6 +85,7 @@ class TableResource[+T <: Readable](val factory: StorableFactory[T], val path: P
 	        implicit val connection = context.connection
 	        implicit val settings = context.settings
 	        
+	        // TODO: Return result instead
 	        val model = DBModel(table, atts)
 	        Try(model.insert()) match 
 	        {
@@ -103,6 +104,7 @@ class TableResource[+T <: Readable](val factory: StorableFactory[T], val path: P
 	                Model(Vector("required" -> missingParams.map(_.name)))).toResponse
 	}
 	
+	@deprecated("Use Relation class postFrom() instead", "v1.0")
 	def postRelationTarget(relation: Relation, target: Table, sourceIndex: Value)
 	        (implicit context: DBContext) = 
 	{
