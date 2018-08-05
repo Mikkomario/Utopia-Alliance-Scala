@@ -32,7 +32,7 @@ import utopia.vault.sql.Limit
 * @author Mikko Hilpinen
 * @since 23.5.2018
 **/
-class RowResource(val data: Readable, val tableResource: TableResource[Readable]) 
+class RowResource(val data: Readable, val tableResource: TableResource) 
         extends Resource[DBContext]
 {
     // ATTRIBUTES    -----------------------

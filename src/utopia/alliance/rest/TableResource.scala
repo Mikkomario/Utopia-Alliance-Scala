@@ -29,36 +29,58 @@ import scala.util.Failure
 import utopia.access.http.BadRequest
 import utopia.flow.datastructure.immutable.Model
 import utopia.vault.model.Reference
+import utopia.nexus.rest.Ready
 
 /**
 * This resource handles data in a single table, referencing other resources when necessary
 * @author Mikko Hilpinen
 * @since 22.5.2018
 **/
-class TableResource[+T <: Readable](val factory: StorableFactory[T], val path: Path, 
-        val relations: Map[String, Relation] = HashMap(), 
+class TableResource(val table: Table, val path: Path, val relations: Map[String, Relation] = HashMap(), 
         val allowedMethods: Traversable[Method] = Vector(Get)) extends Resource[DBContext]
 {
     // COMPUTED    --------------------
     
-    def table = factory.table
-    
     def name = path.lastElement
 	def follow(path: Path)(implicit context: DBContext): ResourceSearchResult = 
 	{
-        // If the path references another resource, redirects the request to that resource
-        /*
-        val targetResource = relatedResource(path.head)
-        if (targetResource.isDefined)
-        {
-            
-        }*/
+        // Some functions behave differently for the last element and the rest
+        val nextIsLast = path.length == 1
+        val method = context.request.method
         
-        ???
+        // For Post, Put and Delete, handles the last part in this resource
+        if (nextIsLast && method != Get)
+        {
+            Ready(Some(path))
+        }
+        else
+        {
+            // If the path references another resource, redirects the request to that resource
+            // (except if handling the last part)
+            /* TODO: This is not how related resources work. Relation is always for the index
+             * -> Needs to first check if request starts with index
+            relatedResource(path.head) match 
+            {
+                case Some((relation, target)) => 
+                {
+                    // Get -> Last: Redirect to row (one) or list (many), not last: redirect to target
+                    // Post -> Last: 
+                }
+            }*/
+            
+            /*
+            val targetResource = relatedResource(path.head)
+            if (targetResource.isDefined)
+            {
+                
+            }*/
+            
+            ???
+        }
     }
 	def toResponse(remainingPath: Option[Path])(implicit context: DBContext): Response = ???
 	
-	// TODO: On post handling, also create the appropriate bridges
+	// TODO: On post handling, also create the appropriate bridges (added to Relation.postFrom)
 	// TODO: Handle ordering (including default order)
 	// TODO: Create read-only versions for these resources
 	

@@ -14,7 +14,7 @@ object TableResources
 {
 	// ATTRIBUTES    ---------------------
     
-    private var resources = HashSet[TableResource[Readable]]()
+    private var resources = HashSet[TableResource]()
     
     
     // COMPUTED    ----------------------
@@ -30,7 +30,7 @@ object TableResources
     /**
      * A resource for the provided table, if there is one
      */
-    def resourceForTable(table: Table) = resources.find(_.factory.table == table)
+    def resourceForTable(table: Table) = resources.find(_.table == table)
     
     /*
      * A resource for a table with the provided name, if there is one
@@ -40,11 +40,11 @@ object TableResources
     /**
      * Introduces a new resource to this set
      */
-    def introduce(resource: TableResource[Readable]) = resources += resource
+    def introduce(resource: TableResource) = resources += resource
     
     /**
      * Introduces multiple resources to this set
      */
-    def introduce(first: TableResource[Readable], second: TableResource[Readable], 
-            more: TableResource[Readable]*) = resources ++= first +: second +: more
+    def introduce(first: TableResource, second: TableResource, more: TableResource*) = 
+            resources ++= first +: second +: more;
 }

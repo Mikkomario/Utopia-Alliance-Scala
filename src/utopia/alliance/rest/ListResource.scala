@@ -31,13 +31,14 @@ import utopia.nexus.result.Result
 import utopia.access.http.MethodNotAllowed
 import utopia.vault.sql.Select
 import utopia.nexus.rest.Ready
+import utopia.vault.model.DBModel
 
 /**
 * This resource represents a list of objects / rows
 * @author Mikko Hilpinen
 * @since 25.5.2018
 **/
-class ListResource(val name: String, val tableResource: TableResource[Readable], 
+class ListResource(val name: String, val tableResource: TableResource, 
         val data: Seq[Readable]) extends Resource[DBContext]
 {
     // ATTRIBUTES    ---------------------
@@ -52,7 +53,7 @@ class ListResource(val name: String, val tableResource: TableResource[Readable],
      */
     def table = tableResource.table
     
-    private def indexCondition = tableResource.factory.table.primaryColumn.map(
+    private def indexCondition = tableResource.table.primaryColumn.map(
             _ in data.map(_.index: ConditionElement))
     
     
@@ -185,7 +186,8 @@ class ListResource(val name: String, val tableResource: TableResource[Readable],
                 
                 val select = indexCondition.map(
                         Select(reference.toSqlTarget, target.table.columns) + Where(_));
-                val data = select.map(context.connection.apply).map(_.rows.map(_.toModel).flatMap(target.factory.apply))
+                val data = select.map(context.connection.apply).map(_.rows.map(_.toModel).map(
+                        DBModel.apply(target.table, _)))
                 data.map(new ListResource(refName, target, _))    
         }
     }
