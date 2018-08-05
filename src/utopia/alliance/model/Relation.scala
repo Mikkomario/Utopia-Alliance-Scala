@@ -188,6 +188,7 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
         implicit val settings = context.settings
         
         // Checks if all required parameters have been provided
+        // TODO: Should acknowledge table specific parameters (eg. user.name)
         if (requiredPostParams.forall(context.request.parameters.contains))
         {
             makePost(bridges.map(_.table) :+ to, HashMap(from -> model)).map(_(to)) match 
@@ -231,10 +232,7 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
                 table => table -> canPost(table, existingData)).find(
                 _._2.isDefined).map(p => p._1 -> p._2.get).get;
         
-        // TODO: Also use parameters specified for this table (eg. users.name -> name) 
-        // (Required post params logic needs to be altered at that point)
-        val attributes = context.request.parameters.filter(p => table.find(p.name).exists(
-                !_.usesAutoIncrement)) ++ params;
+        val attributes = context.parametersForTable(table, false) ++ params;
         val model = DBModel(table, attributes)
         
         // Attempts to insert the new model to DB
