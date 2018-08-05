@@ -141,7 +141,7 @@ class RowResource(val data: Readable, val tableResource: TableResource)
         {
             case (relation, target) => 
             {    
-                val select = data.indexCondition.map(Select(relation.toSqlTarget, 
+                val select = data.indexCondition.map(Select(relation.toSqlTarget(), 
                             target.table.columns) + Where(_));
                 
                 // toMany relation -> link to a list

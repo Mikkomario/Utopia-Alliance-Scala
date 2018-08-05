@@ -20,6 +20,7 @@ import utopia.alliance.rest.TableResources
 import utopia.access.http.Headers
 import utopia.access.http.InternalServerError
 import utopia.access.http.BadRequest
+import utopia.vault.sql.SqlTarget
 
 object Relation
 {
@@ -140,14 +141,15 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
     
     // COMPUTED    --------------------
     
-    /**
+    /*
      * Converts this relation to an sql target that contains all of the related tables
      */
+    /*
     def toSqlTarget = 
     {
         // The first target contains 2 tables. Adds the remaining tables.
         links.tail.foldLeft(links.head.toSqlTarget)((target, ref) => target + Join(ref.from.column, ref.to))
-    }
+    }*/
     
     /**
      * All of the additional parameters that are required for a post to the target table when 
@@ -160,6 +162,18 @@ case class Relation(val from: Table, val to: Table, val relationType: RelationTy
                 _.isRequiredInInsert).map(_.name);
         
         bridges.flatMap(_.requiredPostParams) ++ requiredByTarget
+    }
+    
+    
+    // OTHER    -----------------------
+    
+    /**
+     * Converts this relation to an sql target that contains all of the related tables
+     */
+    def toSqlTarget(originalTarget: SqlTarget = links.head.from.table) = 
+    {
+        // Adds the linked tables to the original target
+        links.foldLeft(originalTarget)((target, ref) => target + Join(ref.from.column, ref.to))
     }
     
     /**

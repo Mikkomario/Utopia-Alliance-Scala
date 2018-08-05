@@ -185,7 +185,7 @@ class ListResource(val name: String, val tableResource: TableResource,
             case (reference, target) => 
                 
                 val select = indexCondition.map(
-                        Select(reference.toSqlTarget, target.table.columns) + Where(_));
+                        Select(reference.toSqlTarget(), target.table.columns) + Where(_));
                 val data = select.map(context.connection.apply).map(_.rows.map(_.toModel).map(
                         DBModel.apply(target.table, _)))
                 data.map(new ListResource(refName, target, _))    
