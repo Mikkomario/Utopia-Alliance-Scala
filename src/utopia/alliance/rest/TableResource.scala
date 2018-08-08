@@ -30,6 +30,7 @@ import utopia.access.http.BadRequest
 import utopia.flow.datastructure.immutable.Model
 import utopia.vault.model.Reference
 import utopia.nexus.rest.Ready
+import utopia.nexus.rest.Context
 
 /**
 * This resource handles data in a single table, referencing other resources when necessary
@@ -37,7 +38,8 @@ import utopia.nexus.rest.Ready
 * @since 22.5.2018
 **/
 class TableResource(val table: Table, val path: Path, val relations: Map[String, Relation] = HashMap(), 
-        val allowedMethods: Traversable[Method] = Vector(Get)) extends Resource[DBContext]
+        val allowedMethods: Traversable[Method] = Vector(Get), 
+        val parameterMods: Map[String, (String, Value) => (String, Value)] = HashMap()) extends Resource[DBContext]
 {
     // COMPUTED    --------------------
     
@@ -89,6 +91,13 @@ class TableResource(val table: Table, val path: Path, val relations: Map[String,
 	 */
 	def relatedResource(relationName: String) = relations.get(relationName).flatMap(relation => 
 	        TableResources.resourceForTable(relation.to).map(relation -> _));
+	
+	/**
+	 * Provides parameters modified by parameter modifiers associated with this resource
+	 */
+	// TODO: Switch to conditions
+	def modifiedParameters()(implicit context: Context) = context.request.parameters.attributes.map(
+	        c => parameterMods.get(c.name.toLowerCase()).map(_(c.name, c.value)).getOrElse(c.name -> c.value));
 	
 	/**
 	 * Posts a new item to this table based on the provided context
