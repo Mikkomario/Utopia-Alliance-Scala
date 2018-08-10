@@ -31,6 +31,9 @@ import utopia.flow.datastructure.immutable.Model
 import utopia.vault.model.Reference
 import utopia.nexus.rest.Ready
 import utopia.nexus.rest.Context
+import utopia.alliance.model.ParameterCondition
+import utopia.flow.datastructure.immutable.Constant
+import utopia.flow.datastructure.template.Property
 
 /**
 * This resource handles data in a single table, referencing other resources when necessary
@@ -39,7 +42,8 @@ import utopia.nexus.rest.Context
 **/
 class TableResource(val table: Table, val path: Path, val relations: Map[String, Relation] = HashMap(), 
         val allowedMethods: Traversable[Method] = Vector(Get), 
-        val parameterMods: Map[String, (String, Value) => (String, Value)] = HashMap()) extends Resource[DBContext]
+        val searchParameterMods: Map[String, Property => ParameterCondition] = HashMap(), 
+        val assignmentMods: Map[String, Property => Constant] = HashMap()) extends Resource[DBContext]
 {
     // COMPUTED    --------------------
     
@@ -93,11 +97,39 @@ class TableResource(val table: Table, val path: Path, val relations: Map[String,
 	        TableResources.resourceForTable(relation.to).map(relation -> _));
 	
 	/**
-	 * Provides parameters modified by parameter modifiers associated with this resource
+	 * Provides parameters that are used as search filters in this resource, possibly modified 
+	 * by local modifiers
 	 */
-	// TODO: Switch to conditions
-	def modifiedParameters()(implicit context: Context) = context.request.parameters.attributes.map(
-	        c => parameterMods.get(c.name.toLowerCase()).map(_(c.name, c.value)).getOrElse(c.name -> c.value));
+	def searchParameters()(implicit context: Context) = context.request.parameters.attributes.flatMap 
+	{
+	    // TODO, wet wet. Add support for prefixes
+	    c => 
+	        val modded = searchParameterMods.get(c.name.toLowerCase()).map(_(c))
+	        modded.orElse
+	        {
+	            if (table.contains(c.name))
+	                Some(ParameterCondition.equality(c))
+	            else
+	                None
+	        }
+	}
+	
+	/**
+	 * Provides parameters that are used in assignments to this table. Possibly modified by 
+	 * local modifiers.
+	 */
+	def assignmentParameters()(implicit context: Context) = context.request.parameters.attributes.flatMap
+    {
+        c => 
+            val modded = assignmentMods.get(c.name.toLowerCase()).map(_(c))
+            modded.orElse
+            {
+                if (table.contains(c.name))
+                    Some(c)
+                else
+                    None
+            }
+    }
 	
 	/**
 	 * Posts a new item to this table based on the provided context
