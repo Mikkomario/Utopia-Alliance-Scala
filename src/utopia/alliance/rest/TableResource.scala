@@ -48,6 +48,13 @@ class TableResource(val table: Table, val path: Path, val relations: Map[String,
     // COMPUTED    --------------------
     
     def name = path.lastElement
+    
+    // Possible parameter prefixes
+    private def prefixes = Vector(name, table.name).map(_.toLowerCase() + ".")
+    
+    
+    // IMPLEMENTED    -----------------
+    
 	def follow(path: Path)(implicit context: DBContext): ResourceSearchResult = 
 	{
         // Some functions behave differently for the last element and the rest
@@ -102,16 +109,8 @@ class TableResource(val table: Table, val path: Path, val relations: Map[String,
 	 */
 	def searchParameters()(implicit context: Context) = context.request.parameters.attributes.flatMap 
 	{
-	    // TODO, wet wet. Add support for prefixes
-	    c => 
-	        val modded = searchParameterMods.get(c.name.toLowerCase()).map(_(c))
-	        modded.orElse
-	        {
-	            if (table.contains(c.name))
-	                Some(ParameterCondition.equality(c))
-	            else
-	                None
-	        }
+	    c => searchParameterMods.get(c.name.toLowerCase()).map(_(c)).orElse(
+	            filterTableParam(c).map(ParameterCondition.equality))
 	}
 	
 	/**
@@ -120,16 +119,25 @@ class TableResource(val table: Table, val path: Path, val relations: Map[String,
 	 */
 	def assignmentParameters()(implicit context: Context) = context.request.parameters.attributes.flatMap
     {
-        c => 
-            val modded = assignmentMods.get(c.name.toLowerCase()).map(_(c))
-            modded.orElse
-            {
-                if (table.contains(c.name))
-                    Some(c)
-                else
-                    None
-            }
+        c => assignmentMods.get(c.name.toLowerCase()).map(_(c)).orElse(filterTableParam(c))
     }
+	
+	private def filterTableParam(c: Property): Option[Constant] = 
+	{
+	    val lowerName = c.name.toLowerCase()
+	    
+	    // Handles possible prefixes
+	    // Possibly uses recursion
+	    prefixes.find(lowerName.startsWith).map(prefix => filterTableParam(
+	            new Constant(c.name.drop(prefix.length()), c.value))).getOrElse 
+	    {
+	        // If no prefix used, makes sure table contains the property
+	        if (table.contains(c.name))
+	            Some(new Constant(c.name, c.value))
+	        else
+	            None
+	    }
+	}
 	
 	/**
 	 * Posts a new item to this table based on the provided context

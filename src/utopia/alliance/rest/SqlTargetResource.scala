@@ -15,6 +15,7 @@ import utopia.vault.sql.SqlSegment
 import utopia.vault.sql.Update
 import scala.collection.immutable.HashMap
 import utopia.vault.sql.Delete
+import utopia.nexus.rest.Context
 
 /**
 * This class wraps a non-read sql target as a resource that can be followed or instantiated
@@ -24,8 +25,6 @@ import utopia.vault.sql.Delete
 class SqlTargetResource(val parent: TableResource, val name: String, val target: SqlTarget, 
         val condition: Option[Condition] = None) extends Resource[DBContext]
 {
-    // TODO: Add parameter handlers (to tableResource) (eg. basic parameter conditions, where, custom)
-    
     // COMPUTED    -------------------------
     
     /**
@@ -44,14 +43,24 @@ class SqlTargetResource(val parent: TableResource, val name: String, val target:
 	
 	// OTHER    ---------------------------
 	
-	private def followReference(refName: String) = 
+	// Generates a new resource to follow, based on a reference. Returns none if there is no such 
+	// reference available
+	private def followReference(refName: String)(implicit context: Context) = 
 	{
 	    parent.relatedResource(refName).map
 	    {
 	        case (relation, resource) =>
 	        {
-	            // TODO: Handle conditions
-	            new SqlTargetResource(resource, refName, relation.toSqlTarget(target), condition)
+	            // Finds the additional conditions that are added for the target resource
+	            // (expects conditions to be applied for the current resource(s) already)
+	            val additionalCondition = resource.searchParameters().flatMap(
+	                    _.toSqlConditionFor(resource.table)).reduceOption(_ && _);
+	            // Combines the new condtion with the existing one
+	            val finalCondition = condition.map(myCondition => 
+	                    additionalCondition.map(myCondition && _).getOrElse(myCondition))
+	                    .orElse(additionalCondition);
+	            
+	            new SqlTargetResource(resource, refName, relation.toSqlTarget(target), finalCondition)
 	        }
 	    }
 	}
